@@ -1,0 +1,1602 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <title>Quadra Blocks</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf8" />
+    <meta name="description" content="Classic arcade game">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+
+    <script type="text/javascript">
+        var WIDTH = 10;        // nombre de cases en largeur
+        var HEIGHT = 20;        // nombre de cases en hauteur
+        var CELL_SIZE = 30;        // largeur d'une case en pixel
+        var START_SPEED = 525;        // vitesse initiale
+        var COEF_SPEED = 0.8;
+        var DELTA_SPEED = 50;
+
+
+        var ignore_user = false;
+
+        var enable_ghost = true;
+        var enable_next = true;
+        var enable_music = true;
+        var enable_sounds = true;
+
+        var enable_bag = false;
+        var enable_bastard = false;
+        var enable_random_bastard = false;
+        // false, false : Full random   => useless
+        // true, false : Bags            => Classic
+        // false, true : Full bastard   => Nightmare
+        // true, true : Soft bastard    => useless
+        
+        var background_folder = "modern_backgrounds";
+        var tiles_folder = "modern_tiles";
+        var sound_set = "1";
+
+        var move_time_out = null;
+        var repeat_time_out = null;
+        var rmlines_time_out = null;
+
+        var showed_blocks = null;
+
+        var BLOCS = new Array( new Array(0,0,0,1,0,2,1,1) , new Array(0,0,0,1,-1,1,1,1) , new Array(0,0,0,1,0,2,-1,1) , new Array(-1,1,0,1,0,2,1,1),"2",    // T
+                             new Array(0,0,0,1,1,0,1,1) , new Array(0,0,0,1,1,0,1,1) , new Array(0,0,0,1,1,0,1,1) , new Array(0,0,0,1,1,0,1,1),"3",            // O
+                              new Array(0,0,0,1,1,1,1,2) , new Array(1,1,0,2,1,2,2,1) , new Array(1,0,1,1,2,1,2,2) , new Array(1,0,0,1,1,1,2,0),"4",        // S
+                               new Array(1,0,0,1,1,1,0,2) ,  new Array(0,1,1,2,1,1,2,2), new Array(2,0,1,1,2,1,1,2) ,new Array(0,0,1,1,1,0,2,1) ,"1",        // Z
+                                new Array(0,0,0,1,0,2,0,-1) , new Array(0,1,1,1,2,1,-1,1) , new Array(1,0,1,1,1,2,1,-1) , new Array(0,0,1,0,2,0,-1,0),"0",    // I
+                                 new Array(1,0,2,0,1,1,1,2) , new Array(0,0,0,1,1,1,2,1) , new Array(1,0,1,1,1,2,0,2) , new Array(0,1,1,1,2,1,2,2),"5",        // L
+                                  new Array(0,0,1,0,1,1,1,2) , new Array(0,1,1,1,2,1,0,2) , new Array(1,0,1,1,1,2,2,2) , new Array(0,1,1,1,2,1,2,0),"6");    // J
+        
+        var SCORES = new Array(40,100,300,1200);
+        
+        var LEVEL_STR;
+        var ROWS_STR;
+        var SCORE_STR;
+        var PAUSE_STR;
+        var GAMEOVER_STR;
+        var NEXT_STR;
+        var ABORT_STR;
+        var QUIT_STR;
+        var RESUME_STR;
+        
+
+        /*-----------------------------------------------------------------------------*/
+        /* Gestion du score */
+        var score = 0;
+        var lignes = 0;
+
+        var current_level = 1;
+        var current_speed;
+
+        function add_lines(n)
+        {
+            lignes += n;    
+            update_level();
+        }
+        
+        function add_score(s)
+        {
+            score += s*current_level;
+            update_score();
+        }
+        
+        function update_score()
+        {
+            var cadre = document.getElementById("score1");
+            cadre.innerHTML = LEVEL_STR+"<br />"+current_level;
+            cadre = document.getElementById("score2");
+            cadre.innerHTML = SCORE_STR+"<br />"+score;
+            cadre = document.getElementById("score3");
+            cadre.innerHTML = ROWS_STR+"<br/>"+lignes;
+        }
+        
+
+        function update_level()
+        {
+            var old_niv = current_level;
+            current_level = Math.floor(lignes/10)+1;
+            
+            if(current_level > 10)
+                current_level = 10;
+            
+            if(current_level != old_niv)
+            {
+                var game = document.getElementById("game_wrapper");
+                game.style.backgroundImage = "url('assets/"+background_folder+"/"+current_level+".png')";
+            }
+            
+            //current_speed = START_SPEED - DELTA_SPEED*(current_level-1);
+            current_speed = Math.floor(START_SPEED * (Math.pow(COEF_SPEED,current_level-1)));
+            
+            update_score();
+        }
+        
+        
+        /*-----------------------------------------------------------------------------*/
+        /* Initialisations */
+        
+        function init()
+        {
+            init_strings();
+        
+            var cadre = document.getElementById("game");
+            cadre.className = tiles_folder;
+            var i,j;
+            
+            var contenu = "";
+            
+            contenu += "<div id=\"game_canvas\">";
+            for(j=0 ; j<HEIGHT; j++)
+                for(i=0 ; i<WIDTH ; i++)
+                    contenu += "<div id=\"bloc"+i+"-"+j+"\"></div>";
+            contenu += "<div id=\"info\"><div id=\"info_label\"></div><a id=\"info_button1\" href=\"#\"></a><a id=\"info_button2\" href=\"#\"></a></div></div>";
+            
+            contenu += "<div id=\"cadre_next\">";
+            for(j=0 ; j<4; j++)
+                for(i=WIDTH+1 ; i<WIDTH+4 ; i++)
+                       contenu += "<div id=\"bloc"+i+"-"+j+"\"></div>";
+            contenu += NEXT_STR+"</div>";
+
+            contenu += "<div id=\"score1\">"+LEVEL_STR+"<br />&nbsp;</div><div id=\"score2\">"+SCORE_STR+"<br />&nbsp;</div><div id=\"score3\">"+ROWS_STR+"<br />&nbsp;</div>";
+            
+
+            cadre.innerHTML = contenu;
+            
+            cadre.style.width = (CELL_SIZE*(WIDTH+3)+29)+"px";
+            //cadre.style.height = CELL_SIZE*HEIGHT+"px";
+            
+            var game = document.getElementById("game_canvas");
+            game.style.width = (CELL_SIZE*WIDTH)+"px";
+            game.style.height = CELL_SIZE*HEIGHT+"px";
+            
+            var info = document.getElementById("info");
+            info.style.width = (CELL_SIZE*WIDTH)+"px";
+            info.style.height = "68px";
+            info.style.paddingTop = "10px";
+            info.style.marginTop = ((CELL_SIZE*HEIGHT-100)/2)+"px";
+
+
+            var bloc = document.getElementById("cadre_next");
+            bloc.style.width = (3*CELL_SIZE+10)+"px";
+            
+            document.getElementById("score1").style.width = (3*CELL_SIZE+10)+"px";
+            document.getElementById("score2").style.width = (3*CELL_SIZE+10)+"px";
+            document.getElementById("score3").style.width = (3*CELL_SIZE+10)+"px";
+            
+            for(i=0 ; i<WIDTH+4 ; i++)
+            {
+                for(j=0 ; j<HEIGHT ; j++)
+                {
+                    if(i != WIDTH && (i<WIDTH || j<4))
+                    {
+                        bloc = document.getElementById("bloc"+i+"-"+j);
+                        bloc.style.width = (CELL_SIZE)+"px";
+                        bloc.style.height = (CELL_SIZE)+"px";
+                        bloc.style.cssFloat = "left";
+                    }
+                }
+            }
+            
+            showed_blocks = new Array();
+            for(i=0 ; i<WIDTH ; i++)
+            {
+                showed_blocks[i] = new Array();
+                for(j=0 ; j<HEIGHT; j++)
+                    showed_blocks[i][j]=false;
+            }
+
+            document.getElementById("info_button1").onclick = toggle_pause;
+            document.getElementById("info_button2").onclick = stop;
+        }
+    
+        function init_strings()
+        {
+            LEVEL_STR = "Level";
+            ROWS_STR = "Rows";
+            SCORE_STR = "Score";
+            PAUSE_STR =  "Pause";
+            GAMEOVER_STR = "Game Over";
+            NEXT_STR = "Next";
+            QUIT_STR = "Quit";
+            RESUME_STR = "Resume";
+            ABORT_STR = "Abort";
+        }
+
+        function reset()
+        {
+            current_bloc = null;
+            next_bloc_id = null;
+            is_paused = false;
+            is_game_ended = false;
+            ignore_user = false;
+            
+            repeated_command = null;
+            repeat_enabled = false;
+            repeat_id = 0;
+            last_failed_move = null;
+            lines_to_remove = null;
+            
+            commands_down = new Array();
+            bag = new Array(true, true, true,true, true, true, true);
+            
+            score = 0;
+            lignes = 0;
+            
+            if(repeat_time_out != null)
+                clearTimeout(repeat_time_out);
+            if(move_time_out != null)
+                clearTimeout(move_time_out);
+            if(rmlines_time_out != null)
+                clearTimeout(rmlines_time_out);
+            
+            var i,j;
+            for(i=0 ; i<WIDTH ; i++)
+                for(j=0 ; j<HEIGHT ; j++)
+                    hide_cell(i,j,false);
+            
+            var game = document.getElementById("game_wrapper");
+            game.style.backgroundImage = "url('assets/"+background_folder+"/1.png')";
+        }
+
+        /*-----------------------------------------------------------------------------*/
+        /* Opérations utilisateur */
+
+        var is_paused = false;
+        var is_game_ended = true;
+
+        function start()
+        {
+            hide_menu();
+            reset();
+            update_level();
+            
+            document.getElementById("cadre_next").style.visibility = enable_bastard ? "hidden":"visible";
+            
+            set_info(null);
+
+            next_bloc_id = next_bloc();
+            new_bloc();
+            display_current_bloc_if_possible();
+            update_score();
+            start_music(true);
+            
+            if(move_time_out != null)
+                clearTimeout(move_time_out);
+            move_time_out = setTimeout("move()",current_speed);
+        }
+
+        function abort()
+        {
+            if(is_game_ended)
+                return;
+        
+            var game = document.body;
+        
+            is_paused = true;
+            pause_music();
+            
+            set_info(GAMEOVER_STR, QUIT_STR);
+            is_game_ended = true;
+            
+            save_score(score, 2*enable_bastard - enable_random_bastard);
+        }
+
+        function stop() {
+            abort();
+            show_menu();
+        }
+        
+        function save_score(score, mode) {
+            if(score > localStorage.getItem('best_score_'+mode)) {
+                localStorage.setItem('best_score_'+mode, score);
+                load_scores();
+            }
+        }
+
+
+        function toggle_pause()
+        {
+            if(is_game_ended)
+                return;
+        
+            is_paused = !is_paused;
+            if(is_paused)
+            {
+                set_info(PAUSE_STR, ABORT_STR, RESUME_STR);
+                sound("pause");
+                pause_music();
+            }
+            else
+            {
+                set_info(null);
+                move();
+                start_music(false);
+            }
+            
+            return is_paused;
+        }
+        
+        function set_enable_music(bool)
+        {
+            enable_music = bool;
+            if(enable_music)
+                start_music(false);
+            else
+                pause_music();
+        }
+        
+        function set_enable_sounds(bool)
+        {
+            enable_sounds = bool;
+        }
+        
+        function set_enable_next(bool)
+        {
+            enable_next = bool;
+            display_next_bloc();
+        }
+        
+        function set_enable_ghost(bool)
+        {
+            enable_ghost = bool;
+        }
+        
+        /*-----------------------------------------------------------------------------*/
+        /* Lancement d'un nouveau bloc */
+        
+        var current_bloc_x;
+        var current_bloc_y;
+        var current_bloc_id;
+        var current_bloc_orientation;
+        var current_bloc = null;
+        var next_bloc_id;
+        
+        function new_bloc()
+        {
+            if(current_bloc != null && is_current_bloc_out())
+            {
+                abort();
+                return;
+            }
+        
+            if(last_failed_move != null && last_failed_move == repeated_command)
+                perform(last_failed_move);
+            
+            ignore_user = true;
+            if(current_bloc == null)
+                new_bloc_end();
+            else
+                check_lines();
+        }
+
+
+        function new_bloc_end()
+        {
+            current_bloc_x = 4;
+            current_bloc_y = -1;
+            current_bloc_orientation = 0;
+            current_bloc_id = next_bloc();
+            update_current_bloc();
+            display_next_bloc();
+            if(!display_current_bloc_if_possible())
+            {
+                abort();
+            }
+            
+            ignore_user = false;
+        }
+        
+        function next_bloc()
+        {
+            if(enable_bastard)
+            {
+                next_bloc_id = -1;
+                return next_block_bastard();
+            } else {
+                var next = next_bloc_id != null ? next_bloc_id :next_block_standard();
+                next_bloc_id = next_block_standard();
+                return next;
+            }
+
+        }
+        
+        function next_block_standard()
+        {
+            check_bag();
+            var i;
+            var c = 0;
+            for(i=0 ; i<bag.length ; i++)
+            {
+                if(bag[i])
+                    c ++;
+            }
+            var rand =  Math.floor(Math.random() * c);
+            
+            c = 0;
+            for(i=0 ; i<bag.length ; i++)
+            {
+                if(bag[i])
+                {
+                    if(c == rand)
+                    {
+                        bag[i] = false;
+                        return i;
+                    }
+                    c ++;
+                }
+            }
+            return 0;
+        }
+        
+        /*-----------------------------------------------------------------------------*/
+        /* Vérification des nouvelles lignes */
+
+        var lines_to_remove = null;
+        
+        function num_sort_asc(a, b){ return (a-b); }
+        
+        function check_lines()
+        {
+            if(typeof(current_bloc_id)!='undefined')
+            {
+                var l = new Array(current_bloc_y+current_bloc[1],current_bloc_y+current_bloc[3],current_bloc_y+current_bloc[5],current_bloc_y+current_bloc[7]);
+                var cl=-1,k,i,t=false,n=0;
+                lines_to_remove = new Array();
+                l.sort(num_sort_asc);
+                for(k = 0 ; k<= 3 ; k++)
+                {
+                    if(l[k] != cl)
+                    {
+                        t = true;
+                        cl = l[k];
+                        for(i = 0 ; i<WIDTH; i++)
+                            t = t && is_cell_showed(i,cl);
+                        if(t)
+                        {
+                            rmlines(cl);
+                            lines_to_remove[n] = cl;
+                            n++;
+                        }
+
+                    }
+                }
+                push_sound(n);
+                add_lines(n);
+                if(n>0)
+                {
+                    add_score(SCORES[n-1]);
+                    if(rmlines_time_out != null)
+                        clearTimeout(rmlines_time_out);
+                    rmlines_time_out = setTimeout("rmlines_end()",100);
+                }
+                else
+                    rmlines_end();
+            }
+        }
+        
+        function rmlines_end()
+        {
+            var k;
+            if(lines_to_remove == null)
+                return;
+            for(k = 0 ; k < lines_to_remove.length ; k++)
+            {
+                rmline(lines_to_remove[k]);
+            }
+            lines_to_remove = null;
+            new_bloc_end();
+        }
+        
+        function rmlines(l)
+        {
+            var i;
+            for(i = 0 ; i<WIDTH ; i ++)
+                highlight_cell(i,l);
+        }
+
+        function rmline(l)
+        {
+            var i,j;
+            for(j = l ; j>=0 ; j--)
+            {
+                for(i = 0 ; i<WIDTH ; i ++)
+                {
+                    if(j != 0)
+                        copy_cell(i,j,i,j-1)
+                    else
+                        hide_cell(i,j,false);
+                }
+            }
+        }
+        
+        
+        /*-----------------------------------------------------------------------------*/
+        /* Mise à jour du bloc courant */
+        function update_current_bloc()
+        {
+            current_bloc = BLOCS[current_bloc_orientation+5*current_bloc_id];
+        }
+        
+
+
+        /*-----------------------------------------------------------------------------*/
+        /* Vérifications pour les blocs */
+
+        function is_free(i,j)
+        {
+            return (i>=0 && i<WIDTH && j<HEIGHT && !is_cell_showed(i,j));
+        }
+
+        function check_current_bloc_at(x, y)
+        {
+            return (is_free(x+current_bloc[0],y+current_bloc[1])
+            && is_free(x+current_bloc[2],y+current_bloc[3])
+            && is_free(x+current_bloc[4],y+current_bloc[5])
+            && is_free(x+current_bloc[6],y+current_bloc[7]));
+        }
+
+        function is_current_bloc_out()
+        {
+            return current_bloc_y+current_bloc[1]<0
+            || current_bloc_y+current_bloc[3]<0
+            || current_bloc_y+current_bloc[5]<0
+            || current_bloc_y+current_bloc[7]<0;
+        }
+        
+        /*-----------------------------------------------------------------------------*/
+        /* Affichage des blocs */
+        
+        var ghost_bloc_x;
+        var ghost_bloc_y;
+        
+        function display_ghost_bloc(x,y)
+        {
+            if(enable_ghost)
+            {
+                y ++;
+                while(check_current_bloc_at(x, y))
+                    y++;
+                y --;
+                ghost_bloc_x = x;
+                ghost_bloc_y = y;
+                display_current_bloc(x,y, true);
+            }
+        }
+        
+        function display_current_bloc(x, y, ghost)
+        {
+            show_cell(x+current_bloc[0],y+current_bloc[1], ghost);
+            show_cell(x+current_bloc[2],y+current_bloc[3], ghost);
+            show_cell(x+current_bloc[4],y+current_bloc[5], ghost);
+            show_cell(x+current_bloc[6],y+current_bloc[7], ghost);
+        }
+        
+        function replace_and_display_current_bloc_if_possible()
+        {
+            if(!display_current_bloc_if_possible())
+            {
+                var x = current_bloc_x;
+                var min = min4(x+current_bloc[0] , x+current_bloc[2], x+current_bloc[4], x+current_bloc[6]);
+
+                if(min<0)
+                {
+                    current_bloc_x += -min;
+                    if(display_current_bloc_if_possible())
+                        return true;
+                    current_bloc_x -= -min;
+                    return false;
+                }
+                var max = max4(x+current_bloc[0] , x+current_bloc[2], x+current_bloc[4], x+current_bloc[6]);
+                if(max >= WIDTH)
+                {
+                    current_bloc_x -= (max-WIDTH)+1;
+                    if(display_current_bloc_if_possible())
+                        return true;
+                    current_bloc_x += (max-WIDTH)+1;
+                    return false;
+                    
+                }
+                return false;
+            }
+            return true;
+        }
+
+        function display_current_bloc_if_possible()
+        {
+            if(check_current_bloc_at(current_bloc_x, current_bloc_y))
+            {
+                display_ghost_bloc(current_bloc_x, current_bloc_y);
+                display_current_bloc(current_bloc_x, current_bloc_y, false);
+                
+                return true;
+            }
+            else
+                return false;
+        }
+        
+        function hide_current_bloc()
+        {
+            hide_cell(ghost_bloc_x+current_bloc[0],ghost_bloc_y+current_bloc[1], true);
+            hide_cell(ghost_bloc_x+current_bloc[2],ghost_bloc_y+current_bloc[3], true);
+            hide_cell(ghost_bloc_x+current_bloc[4],ghost_bloc_y+current_bloc[5], true);
+            hide_cell(ghost_bloc_x+current_bloc[6],ghost_bloc_y+current_bloc[7], true);
+
+            hide_cell(current_bloc_x+current_bloc[0],current_bloc_y+current_bloc[1], false);
+            hide_cell(current_bloc_x+current_bloc[2],current_bloc_y+current_bloc[3], false);
+            hide_cell(current_bloc_x+current_bloc[4],current_bloc_y+current_bloc[5], false);
+            hide_cell(current_bloc_x+current_bloc[6],current_bloc_y+current_bloc[7], false);
+        }
+        
+        function display_next_bloc()
+        {
+            var i,j;
+            for(i=0;i<4;i++)
+                for(j=0;j<4;j++)
+                    hide_cell(WIDTH+1+i,j,false);
+            
+            if(enable_next && next_bloc_id != -1)
+            {
+                var np = BLOCS[5*next_bloc_id];
+                var at = current_bloc_id;
+                current_bloc_id = next_bloc_id;
+                show_cell(WIDTH+1+np[0],1+np[1]);
+                show_cell(WIDTH+1+np[2],1+np[3]);
+                show_cell(WIDTH+1+np[4],1+np[5]);
+                show_cell(WIDTH+1+np[6],1+np[7]);
+                current_bloc_id = at;
+            }
+        }
+        
+        /*-----------------------------------------------------------------------------*/
+        /* Gestion des cells */
+        
+        function get_cell(i,j)
+        {
+            return document.getElementById("bloc"+i+"-"+j);
+        }
+
+        function highlight_cell(i,j)
+        {
+            var b = get_cell(i,j);
+            if(b)
+            {
+                b.style.backgroundImage="url('assets/"+tiles_folder+"/show.png')";
+            }
+        }
+
+        function show_cell(i,j, ghost)
+        {
+            var b = get_cell(i,j);
+            if(b)
+            {
+                if(ghost)
+                {
+                    b.style.opacity = 0.4;
+                    b.style.backgroundImage="url('assets/"+tiles_folder+"/ghost.png')";
+                    b.className = "ghost_bloc";
+                }
+                else
+                {
+                    b.style.backgroundImage="url('assets/"+tiles_folder+"/"+BLOCS[4+5*current_bloc_id]+".png')";
+                    b.style.opacity = 1;
+                    b.className = "bloc";
+                    if(i>=0 && i<WIDTH && j<HEIGHT && j >= 0)
+                        showed_blocks[i][j] = true;
+                }
+            }
+        }
+        
+        function hide_cell(i,j,ghost)
+        {
+            var b = get_cell(i,j);
+            if(b)
+            {
+                if(!ghost || b.style.opacity != 1)
+                {
+                    b.style.backgroundImage="";
+                    b.className = "";
+                    if(i>=0 && i<WIDTH && j<HEIGHT && j >= 0)
+                        showed_blocks[i][j] = false;
+                }
+            }
+        }
+        
+        function copy_cell(ai,aj,i,j)
+        {
+            var bloc = get_cell(ai,aj);
+            var bloc2 = get_cell(i,j);
+            bloc.style.backgroundColor = bloc2.style.backgroundColor;
+            bloc.style.backgroundImage = bloc2.style.backgroundImage;
+            bloc.style.opacity = bloc2.style.opacity;
+            bloc.className = bloc2.className;
+            
+            showed_blocks[ai][aj] = showed_blocks[i][j];
+        }
+        
+        function is_cell_showed(i,j)
+        {
+            if(i<0 || i>=WIDTH || j>=HEIGHT)
+                return true;
+            if(j<0)
+                return false;
+            return showed_blocks[i][j];
+        }
+
+        /*-----------------------------------------------------------------------------*/
+        /* Déplacement des blocs */
+
+        function move()
+        {
+            if(! is_paused)
+            {
+                if(repeated_command != "down" && !ignore_user)
+                {
+                    hide_current_bloc();
+                    current_bloc_y ++;
+                    if(! display_current_bloc_if_possible())
+                    {
+                        current_bloc_y --;
+                        display_current_bloc_if_possible();
+                        new_bloc();
+                    }
+                }
+                if(move_time_out != null)
+                    clearTimeout(move_time_out);
+                move_time_out = setTimeout("move()",current_speed);
+            }
+        }
+        
+        /*-----------------------------------------------------------------------------*/
+        /* Commands */
+        
+        var repeated_command = null;
+        var repeat_enabled = false;
+        var commands_down = new Array();
+        var repeat_id = 0;
+        var last_failed_move = null;
+        
+
+        
+        function command_down(command)
+        {
+            if(command == "pause")
+            {
+                toggle_pause();
+                return;
+            }
+        
+            if(command != null && !commands_down[command])
+            {
+                commands_down[command] = true;
+                perform(command);
+                
+                if(command == "left" || command == "right" || command == "down")
+                {
+                    start_repeat(command);
+                }
+            }
+        }
+        
+        function command_up(command)
+        {
+            if(command != null)
+            {
+                commands_down[command] = false;
+            }
+            
+            stop_repeat(); 
+        }
+        
+        function start_repeat(command)
+        {
+            repeat_id ++;
+            repeat_enabled = true;
+            repeated_command = command;
+            
+            var timeout = 150;
+            
+            if(command == "down")
+                timeout = 50;
+            
+            if(repeat_time_out != null)
+                clearTimeout(repeat_time_out);
+            repeat_time_out = setTimeout("repeat('"+repeat_id+"','"+command+"')",timeout);
+        }
+        
+        function stop_repeat()
+        {
+            repeat_enabled = false;
+            repeated_command = null;
+            
+            if(commands_down["left"])
+                start_repeat("left");
+            if(commands_down["right"])
+                start_repeat("right");
+            if(commands_down["down"])
+                start_repeat("down");
+        }
+        
+        function repeat(rid,command)
+        {
+            if(repeat_id == rid && repeat_enabled)
+            {
+                perform(command);
+                if(repeat_time_out != null)
+                    clearTimeout(repeat_time_out);
+                    
+                var timeout = 80;
+                
+                if(command == "down")
+                    var timeout = 50;
+                repeat_time_out = setTimeout("repeat('"+repeat_id+"','"+command+"')",timeout);
+            }
+        }
+        
+        function perform(command)
+        {
+            if(ignore_user)
+                return;
+        
+            last_failed_move = null;
+            if(!is_paused)
+            {
+                if(command == "left")
+                {
+                    hide_current_bloc();
+                    current_bloc_x --;
+                    if(! display_current_bloc_if_possible())
+                    {
+                        last_failed_move = "left";
+                        current_bloc_x ++;
+                        display_current_bloc_if_possible()
+                    }
+                }
+                else if(command == "down")
+                {
+                    hide_current_bloc();
+                    current_bloc_y ++;
+                    if(! display_current_bloc_if_possible())
+                    {
+                        current_bloc_y --;
+                        display_current_bloc_if_possible();
+                        new_bloc();
+                    }
+                }
+                else if(command == "right")
+                {
+                    hide_current_bloc();
+                    current_bloc_x ++;
+                    if(! display_current_bloc_if_possible())
+                    {
+                        last_failed_move = "right";
+                        current_bloc_x --;
+                        display_current_bloc_if_possible();
+                    }
+                }
+                else if(command == "rotate_l" || command == "rotate_r")
+                {
+                    var incr = command == "rotate_l" ? 1 : -1;
+                    hide_current_bloc();
+                    current_bloc_orientation = modulo4(current_bloc_orientation+incr);
+                    update_current_bloc();
+                    if(! replace_and_display_current_bloc_if_possible())
+                    {
+                        current_bloc_orientation = modulo4(current_bloc_orientation-incr);
+                        update_current_bloc();
+                        display_current_bloc_if_possible();
+                    }
+                }
+                else if(command == "drop")
+                {
+                    var l=0;
+                    do {
+                        hide_current_bloc();
+                        current_bloc_y ++;
+                        l++;
+                    }
+                    while(display_current_bloc_if_possible());
+                    current_bloc_y --;
+                    if(!enable_bastard || enable_random_bastard)
+                        add_score(l);
+                    display_current_bloc_if_possible();
+                    new_bloc();
+                }
+            }
+        }
+
+        /*-----------------------------------------------------------------------------*/
+        /* Sounds */
+
+        function start_music(t)
+        {
+            if(enable_music && !is_paused && !is_game_ended)
+            {
+                var myVideo = document.getElementById("soundset"+sound_set+"_musique");
+                if(t)
+                {
+                    myVideo.pause();
+                    try {
+                        myVideo.currentTime = 0;
+                    } catch (e) {}
+                }
+                myVideo.play();
+            }
+        }
+
+        function pause_music()
+        {
+            var myVideo = document.getElementById("soundset"+sound_set+"_musique");
+            myVideo.pause();
+        }
+
+        function sound(name)
+        {
+            if(enable_sounds)
+            {
+                var myVideo = document.getElementById("soundset"+sound_set+"_"+name);
+                if(myVideo) {
+                    myVideo.pause();
+                    try {
+                        myVideo.currentTime = navigator.userAgent.indexOf("Safari")>-1 ? 0 : 0.2;
+                    } catch (e) {}
+                    myVideo.play();
+                }
+            }
+        }
+
+        function push_sound(l)
+        {
+            sound("push"+l);
+        }
+        
+        
+        function set_info(str, abort_str, resume_str)
+        {
+            var info = document.getElementById("info");
+            if(str == null)
+            {
+                info.style.display = "none";
+            }
+            else
+            {
+                info.style.display = "block";
+                var info_label = document.getElementById("info_label");
+                info_label.innerHTML = str;
+                var info_button1 = document.getElementById("info_button1");
+                if(resume_str) {
+                    info_button1.innerHTML = resume_str;
+                    info_button1.style.display = "inline";
+                } else {
+                    info_button1.style.display = "none";
+                }
+                var info_button2 = document.getElementById("info_button2");
+                info_button2.innerHTML = abort_str;
+            }
+        }
+        
+        /*-----------------------------------------------------------------------------*/
+        /* Helpers */
+    
+        function modulo4(i)
+        {
+            var r = i%4;
+            while(r<0)
+                r+=4;
+            return r;
+        }
+        
+        function min4(a,b,c,d)
+        {
+            return Math.min(Math.min(a,b),Math.min(c,d));
+        }
+        
+        function max4(a,b,c,d)
+        {
+            return Math.max(Math.max(a,b),Math.max(c,d));
+        }
+        
+
+        /*-----------------------------------------------------------------------------*/
+        /* Bastard block */
+        var bag;
+        var showed_blocks_copy;
+        
+        function copy_showed_blocks()
+        {
+            showed_blocks_copy = new Array();
+            for(i=0 ; i<WIDTH ; i++)
+            {
+                showed_blocks_copy[i] = new Array();
+                for(j=0 ; j<HEIGHT; j++)
+                {
+                    showed_blocks_copy[i][j] = showed_blocks[i][j]?2:1;
+                }
+            }
+            for(i=0 ; i<WIDTH ; i++)
+                recursive_copy(i,0);
+        }
+        
+        function recursive_copy(i,j)
+        {
+            if(!(i<0 || j<0 || i>=WIDTH || j>=HEIGHT) && showed_blocks_copy[i][j] == 1)
+            {
+                showed_blocks_copy[i][j] = 0;
+                
+                recursive_copy(i-1,j);
+                recursive_copy(i+1,j);
+                recursive_copy(i,j+1);
+                recursive_copy(i,j-1);
+            }
+        }
+        
+        function next_block_bastard()
+        {
+            copy_showed_blocks();
+        
+            if(enable_bag)
+                check_bag();
+            var row, column, block,orient;
+            var worse_blocks = null;
+            var worse_rate = 100;
+            var best_rate = 0;
+            for(block = 0 ; block < 7 ; block ++)
+            {
+                if(enable_bag && !bag[block])
+                    continue;
+                
+                best_rate = 0;
+
+
+                for(orient = 0 ; orient < 4 ; orient ++)
+                {
+                    var c_block = BLOCS[5*block + orient];
+                    var width = block_width(c_block);
+                    
+                    for(row = -2 ; row < WIDTH+2 ; row ++)
+                    {
+                        for(column = -2 ; column < HEIGHT+2 ; column ++)
+                        {
+                            var rate = test_bloc(c_block, row, column, width);
+
+                            if(rate > best_rate)
+                                best_rate = rate;
+                        }
+                    }
+                }
+
+                if(enable_random_bastard)
+                    best_rate = best_rate*Math.random();
+
+                if(best_rate < worse_rate)
+                {
+                    worse_blocks = new Array();
+                    worse_rate = best_rate;
+                }
+                if(best_rate <= worse_rate)
+                {
+                    worse_blocks.push(block);
+                }
+            }
+            var rand = Math.floor(Math.random() * worse_blocks.length);
+            var worse_block = worse_blocks[rand];
+            if(enable_bag)
+                bag[worse_block] = false;
+            
+            return worse_block;
+        }
+        
+        function check_bag()
+        {
+        
+            var i;
+            for(i = 0 ; i < bag.length; i++)
+            {
+                if(bag[i])
+                    return;
+            }
+            for(i = 0 ; i < bag.length ; i++)
+                bag[i] = true;
+        }
+        
+        function block_width(b)
+        {
+            var k;
+            var x = new Array(false, false, false, false);
+            var result = 0;
+            for(k = 0 ; k<4 ; k++)
+            {
+                if(!x[b[2*k]+1])
+                {
+                    result ++;
+                    x[b[2*k]+1] = true;
+                }
+            }
+            return result;
+        }
+        
+        function test_bloc(block, i, j, width)
+        {
+            var k;
+            for(k = 0 ; k<4 ; k++)
+            {
+                if(! is_free_cell(block[2*k]+i,block[2*k+1]+j))
+                    return -1;
+            }
+            
+            var appuis = 0;
+            for(k = 0 ; k<4 ; k++)
+            {
+                if(!is_free_cell(block[2*k]+i,block[2*k+1]+j+1))
+                    appuis ++;
+            }
+            
+            if(appuis == 0)
+                return -1;
+            
+            for(k = 0 ; k<4 ; k++)
+                showed_blocks[block[2*k]+i][block[2*k+1]+j] = true;
+            
+            var nbline = count_lines(block, j);
+            
+            for(k = 0 ; k<4 ; k++)
+                showed_blocks[block[2*k]+i][block[2*k+1]+j] = false;
+            
+            return 2*nbline + appuis/width;
+        }
+        
+        function count_lines(current_bloc, current_bloc_y)
+        {
+            var l = new Array(current_bloc_y+current_bloc[1],current_bloc_y+current_bloc[3],current_bloc_y+current_bloc[5],current_bloc_y+current_bloc[7]);
+            var cl=-1,k,i,t=false,n=0;
+            l.sort(num_sort_asc);
+            for(k = 0 ; k<= 3 ; k++)
+            {
+                if(l[k] != cl)
+                {
+                    t = true;
+                    cl = l[k];
+                    for(i = 0 ; i<WIDTH; i++)
+                        t = t && is_cell_showed(i,cl);
+                    if(t)
+                        n++;
+
+                }
+            }
+            return n;
+        }
+        
+        function is_free_cell(i,j)
+        {
+            return !(i<0 || i>=WIDTH || j>=HEIGHT || j<0 || showed_blocks_copy[i][j]);
+        }
+
+        function command_from_event(evenement)
+        {
+            var touche = evenement.which;
+            if(touche == 37 || touche == 74)
+                return "left";
+            if(touche == 17 || touche == 96 || touche == 75)
+                return "rotate_l";
+            if(touche == 38 || touche == 73)
+                return "rotate_r";
+            if(touche == 39 || touche == 76)
+                return "right";
+            if(touche == 32)
+                return "drop";
+            if(touche == 40 || touche == 77)
+                return "down";
+            if(touche == 80)
+                return "pause";
+            return null;
+        }
+
+        function keydown(evenement)
+        {
+            if(is_game_ended) {
+                return;
+            }
+            var command = command_from_event(evenement);
+            if(command)
+            {
+                command_down(command);
+                evenement.preventDefault();
+            }
+        }
+        
+        function keyup(evenement)
+        {
+            if(is_game_ended) {
+                return;
+            }
+            var command = command_from_event(evenement);
+            if(command)
+            {
+                command_up(command);
+                evenement.preventDefault();
+            }
+        }
+
+        function load_prefs() {
+            toggle_mode(localStorage.getItem('pref_mode') || 0);
+            toggle_style(localStorage.getItem('pref_style') || 0);
+            toggle_music(localStorage.getItem('pref_music') || 0);
+            toggle_ghost(localStorage.getItem('pref_ghost') || 0);
+        }
+
+        function load_scores() {
+            document.getElementById('best_score_0').innerText = localStorage.getItem('best_score_0') || 0;
+            document.getElementById('best_score_1').innerText = localStorage.getItem('best_score_1') || 0;
+            document.getElementById('best_score_2').innerText = localStorage.getItem('best_score_2') || 0;
+        }
+
+/*
+        var enable_bag = false;
+        var enable_bastard = true;*/
+        function toggle_mode(mode)
+        {
+            localStorage.setItem('pref_mode', mode);
+            var mode0 = document.getElementById("toggle0");
+            var mode1 = document.getElementById("toggle1");
+            var mode2 = document.getElementById("toggle2");
+            mode0.className = "";
+            mode1.className = "";
+            mode2.className = "";
+            if(mode == 0)
+            {
+                enable_bastard = false;
+                enable_bag = true;
+                mode0.className = "selected";
+                toggle_ghost(0);
+            } else if(mode == 1) {
+                enable_bastard = true;
+                enable_bag = false;
+                enable_random_bastard = true;
+                mode1.className = "selected";
+                toggle_ghost(1);
+            } else {
+                enable_bastard = true;
+                enable_bag = false;
+                enable_random_bastard = false;
+                mode2.className = "selected";
+                toggle_ghost(1);
+            }
+        }
+        function toggle_style(style)
+        {
+            localStorage.setItem('pref_style', style);
+            var style0 = document.getElementById("style0");
+            var style1 = document.getElementById("style1");
+            var copyright = document.getElementById("style_copyright");
+            style0.className = "";
+            style1.className = "";
+            if(style == 0)
+            {
+                background_folder = "modern_backgrounds";
+                tiles_folder = "modern_tiles";
+                style0.className = "selected";
+                copyright.innerText = "";
+            } else  {
+                background_folder = "classic_backgrounds";
+                tiles_folder = "classic_tiles";
+                style1.className = "selected";
+                copyright.innerText = "© Visuals: Steve Chamberlin";
+            }
+        }
+        function toggle_music(music)
+        {
+            localStorage.setItem('pref_music', music);
+            var music0 = document.getElementById("music0");
+            var music1 = document.getElementById("music1");
+            var music2 = document.getElementById("music2");
+            var copyright = document.getElementById("music_copyright");
+            music0.className = "";
+            music1.className = "";
+            music2.className = "";
+            if(music == 0)
+            {
+                set_enable_sounds(true);
+                set_enable_music(true);
+                sound_set = "1";
+                music0.className = "selected";
+                copyright.innerText = "© Music: Skandalo Publico";
+            } else if(music == 1) {
+                set_enable_sounds(true);
+                set_enable_music(true);
+                sound_set = "2";
+                music1.className = "selected";
+                copyright.innerText = "© Music: Peter Wagner, SFX: Steve Chamberlin";
+            } else {
+                set_enable_sounds(false);
+                set_enable_music(false);
+                music2.className = "selected";
+                copyright.innerText = "";
+            }
+        }
+        function toggle_ghost(ghost)
+        {
+            var ghost0 = document.getElementById("ghost0");
+            var ghost1 = document.getElementById("ghost1");
+            if(enable_bastard) {
+                ghost = 1;
+                ghost0.style.opacity = 0.4;
+                ghost1.style.opacity = 0.4;
+            } else {
+                ghost0.style.opacity = 1;
+                ghost1.style.opacity = 1;
+            }
+            localStorage.setItem('pref_ghost', ghost);
+            ghost0.className = "";
+            ghost1.className = "";
+            if(ghost == 0)
+            {
+                set_enable_ghost(true);
+                ghost0.className = "selected";
+            } else  {
+                set_enable_ghost(false);
+                ghost1.className = "selected";
+            }
+        }
+
+
+        function show_menu()
+        {
+            document.getElementById("menu_wrapper").style.display = "block";
+            document.getElementById("game_wrapper").style.display = "none";
+            document.getElementById("commands_wrapper").style.display = "none";
+        }
+
+        function hide_menu()
+        {
+            document.getElementById("menu_wrapper").style.display = "none";
+            document.getElementById("game_wrapper").style.display = "inline-block";
+            document.getElementById("commands_wrapper").style.display = "block";
+        }
+    </script>
+    <style type="text/css">
+    body{
+        margin:0;
+        font-family:Verdana, Arial, Helvetica, sans-serif;
+        background-color:#262626;
+        color:#FAFAFA;
+        font-size:14px; 
+        text-align: center;
+    }
+    a {
+        color:#FAFAFA;
+        text-decoration: none;
+    }
+    a.selected {
+        text-decoration: underline;
+    }
+    #title {
+        text-align: center;
+    }
+    #menu_wrapper {
+        width:400px;
+        margin:auto;
+        text-align: left;
+    }
+    #menu_wrapper a{
+        display: inline-block;
+        padding: 4px 8px;
+        margin: 2px 4px 12px 0;
+        background-color: #333333;
+    }
+    #menu_wrapper a.selected{
+        color:#111111;
+        background-color: #F5F5F5;
+        text-decoration: none;
+    }
+    #menu_wrapper .copyright {
+        display: inline-block;
+        margin-left: 8px;
+        font-size: 0.7em;
+        color:#666666;
+    }
+    #menu_wrapper #start_container {
+        text-align: center;
+        margin:48px 0;
+    }
+    #menu_wrapper table td{
+        width:125px;
+    }
+    #menu_wrapper #best_score_0,
+    #menu_wrapper #best_score_1,
+    #menu_wrapper #best_score_2 {
+        padding: 4px 8px;
+        margin: 2px 4px 12px 0;
+        background-color: #333333;
+    }
+    #menu_wrapper #best_score_title {
+        text-align: center;
+        font-size: 1.1em;
+        margin-bottom: 8px;
+    }
+    #game_wrapper  {
+        display: none;
+        padding:7px;
+    }
+    #game  {
+        text-align:center;
+        overflow:auto;
+    }
+    #game_canvas  {
+        background-image:url("assets/dark-translucent.png");
+        border:1px solid white;
+        float:left;
+    }
+    #game #info {
+        position:absolute;
+        display:none;
+        border-top:1px solid white;
+        border-bottom:1px solid white;
+        background-image:url("assets/dark-translucent.png");
+    }
+
+    #game #info #info_label {
+        font-size:2em;
+        text-shadow: #000 0 3px 8px;
+    }
+
+    #game #info #info_button1 {
+        margin-right:32px;
+    }
+    
+    #game #cadre_next {
+       background-image:url("assets/dark-translucent.png");
+       border:1px solid white;
+       padding:5px;
+       float:left;
+       margin-left:5px;
+    }
+    
+    #game #score1,
+    #game #score2, 
+    #game #score3 {
+       font-size:14px;
+       background-image:url("assets/dark-translucent.png");
+       border:1px solid white;
+       padding:5px;
+       float:left;
+       margin-top:5px;
+       margin-left:5px;
+    }
+    #game.im .bloc {
+        -webkit-box-shadow: 0px 0px 3px #000;
+        border-radius: 5px;
+    }
+    #game .bloc {
+        background-size: 30px 30px;
+    }
+    #game .ghost_bloc {
+        background-size: 30px 30px;
+    }
+    #commands_wrapper {
+        margin-top:32px;
+        display: none;
+        font-size:14px;
+    }
+    #commands_wrapper table{
+        margin:auto;
+        font-size: 0.8em;
+    }
+    #commands_wrapper table td {
+        padding: 0 8px;
+    }
+    #footer {
+        position: fixed;
+        right:16px;
+        bottom:2px;
+        font-size: 14px;
+        display: flex;
+    }
+    #footer a {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        text-decoration: none;
+        color:#AAAAAA;
+        fill:#AAAAAA;
+    }
+    #footer a:hover {
+        color:white;
+        fill:white;
+    }
+    #footer svg {
+        width:20px;
+        height: 20px;
+        margin:4px 8px 4px 0;
+    }
+</style>
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-SFEMX5EX8M"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-SFEMX5EX8M');
+</script>
+</head>
+<body  onkeydown="keydown(event);" onkeyup="keyup(event);">
+    <h1 id="title">Quadra Blocks</h1>
+    <audio id="soundset1_musique" preload loop><source src="assets/modern_sounds/music.mp3"  /></audio>
+    <audio id="soundset1_push0" preload ><source src="assets/modern_sounds/0.mp3" /></audio>
+    <audio id="soundset1_push1" preload ><source src="assets/modern_sounds/1.mp3" /></audio>
+    <audio id="soundset1_push2" preload ><source src="assets/modern_sounds/2.mp3" /></audio>
+    <audio id="soundset1_push3" preload ><source src="assets/modern_sounds/3.mp3" /></audio>
+    <audio id="soundset1_push4" preload ><source src="assets/modern_sounds/4.mp3" /></audio>
+    <audio id="soundset2_musique" preload loop><source src="assets/classic_sounds/music.mp3"  /></audio>
+    <audio id="soundset2_push0" preload ><source src="assets/classic_sounds/0.mp3" /></audio>
+    <audio id="soundset2_push1" preload ><source src="assets/classic_sounds/1.mp3" /></audio>
+    <audio id="soundset2_push2" preload ><source src="assets/classic_sounds/2.mp3" /></audio>
+    <audio id="soundset2_push3" preload ><source src="assets/classic_sounds/3.mp3" /></audio>
+    <audio id="soundset2_push4" preload ><source src="assets/classic_sounds/4.mp3" /></audio>
+    <audio id="soundset2_pause" preload ><source src="assets/classic_sounds/pause.mp3" /></audio>
+    <div id="menu_wrapper">
+        <div>Mode</div>
+        <div>
+            <a href="#" onclick="toggle_mode(0);" id="toggle0" class="selected">normal</a>
+            <a href="#" onclick="toggle_mode(1);" id="toggle1">nasty</a>
+            <a href="#" onclick="toggle_mode(2);" id="toggle2">cruel</a>
+        </div>
+        <div>Style</div>
+        <div>
+            <a href="#" onclick="toggle_style(0);" id="style0" class="selected">1</a>
+            <a href="#" onclick="toggle_style(1);" id="style1">2</a>
+            <div id="style_copyright" class="copyright">Copyright</div>
+        </div>
+        <div>Music</div>
+        <div>
+            <a href="#" onclick="toggle_music(0);" id="music0" class="selected">1</a>
+            <a href="#" onclick="toggle_music(1);" id="music1">2</a>
+            <a href="#" onclick="toggle_music(2);" id="music2">off</a>
+            <div id="music_copyright" class="copyright">Copyright</div>
+        </div>
+        <div>Ghost</div>
+        <div>
+            <a href="#" onclick="toggle_ghost(0);" id="ghost0" class="selected">on</a>
+            <a href="#" onclick="toggle_ghost(1);" id="ghost1">off</a>
+        </div>
+        <div id="start_container">
+            <input type="image" src="assets/start.png" onclick="init();start();" />
+        </div>
+        <div>
+            <div id="best_score_title">
+                Best Scores
+            </div>
+            <table>
+                <tr>
+                    <td><div>Normal</div><div id="best_score_0">0</div></td>
+                    <td><div>Nasty</div><div id="best_score_1">0</div></td>
+                    <td><div>Cruel</div><div id="best_score_2">0</div></td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    <div id="game_wrapper">
+        <div id="game">
+
+        </div>
+    </div>
+    <div id="commands_wrapper">
+        <div>Commands</div>
+        <table>
+            <tr><td>Rotate Left</td><td>Rotate Right</td><td>Move Left</td><td>Move Right</td><td>Move Down</td><td>Drop</td><td>Pause</td></tr>
+            <tr><td>ctrl</td><td>↑</td><td>←</td><td>→</td><td>↓</td><td>space</td><td>P</td></tr>
+            <tr><td>K</td><td>I</td><td>J</td><td>L</td><td>M</td><td></td><td></td></tr>
+        </table>
+    </div>
+    <div id="footer">
+        <a href="https://github.com/Yqnn/quadra-blocks" target="_blank">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" height="100%" width="100%" focusable="false">
+            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+        </svg>
+        View on GitHub </a>
+    </div>
+    <script type="text/javascript">
+        load_prefs();
+        load_scores();
+    </script>
+</body>
+</html>

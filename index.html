@@ -10,10 +10,29 @@
         var WIDTH = 10;        // nombre de cases en largeur
         var HEIGHT = 20;        // nombre de cases en hauteur
         var CELL_SIZE = 30;        // largeur d'une case en pixel
-        var START_SPEED = 525;        // vitesse initiale
-        var COEF_SPEED = 0.8;
-        var DELTA_SPEED = 50;
+        var SPEEDS = [500, 333, 250, 200, 167, 133, 117, 100, 83, 58];
 
+        var BLOCKS = [
+            [0,0,0,1,0,2,1,1],  [0,0,0,1,-1,1,1,1], [0,0,0,1,0,2,-1,1], [-1,1,0,1,0,2,1,1], "2", // T
+            [0,0,0,1,1,0,1,1],  [0,0,0,1,1,0,1,1],  [0,0,0,1,1,0,1,1],  [0,0,0,1,1,0,1,1],  "3", // O
+            [0,0,0,1,1,1,1,2],  [1,1,0,2,1,2,2,1],  [1,0,1,1,2,1,2,2],  [1,0,0,1,1,1,2,0],  "4", // S
+            [1,0,0,1,1,1,0,2],  [0,1,1,2,1,1,2,2],  [2,0,1,1,2,1,1,2],  [0,0,1,1,1,0,2,1],  "1", // Z
+            [0,0,0,1,0,2,0,-1], [0,1,1,1,2,1,-1,1], [1,0,1,1,1,2,1,-1], [0,0,1,0,2,0,-1,0], "0", // I
+            [1,0,2,0,1,1,1,2],  [0,0,0,1,1,1,2,1],  [1,0,1,1,1,2,0,2],  [0,1,1,1,2,1,2,2],  "5", // L
+            [0,0,1,0,1,1,1,2],  [0,1,1,1,2,1,0,2],  [1,0,1,1,1,2,2,2],  [0,1,1,1,2,1,2,0],  "6"  // J
+        ];
+        
+        var SCORES = [100, 300, 600, 1000];
+        
+        var LEVEL_STR;
+        var ROWS_STR;
+        var SCORE_STR;
+        var PAUSE_STR;
+        var GAMEOVER_STR;
+        var NEXT_STR;
+        var ABORT_STR;
+        var QUIT_STR;
+        var RESUME_STR;
 
         var ignore_user = false;
 
@@ -39,26 +58,6 @@
         var rmlines_time_out = null;
 
         var showed_blocks = null;
-
-        var BLOCS = new Array( new Array(0,0,0,1,0,2,1,1) , new Array(0,0,0,1,-1,1,1,1) , new Array(0,0,0,1,0,2,-1,1) , new Array(-1,1,0,1,0,2,1,1),"2",    // T
-                             new Array(0,0,0,1,1,0,1,1) , new Array(0,0,0,1,1,0,1,1) , new Array(0,0,0,1,1,0,1,1) , new Array(0,0,0,1,1,0,1,1),"3",            // O
-                              new Array(0,0,0,1,1,1,1,2) , new Array(1,1,0,2,1,2,2,1) , new Array(1,0,1,1,2,1,2,2) , new Array(1,0,0,1,1,1,2,0),"4",        // S
-                               new Array(1,0,0,1,1,1,0,2) ,  new Array(0,1,1,2,1,1,2,2), new Array(2,0,1,1,2,1,1,2) ,new Array(0,0,1,1,1,0,2,1) ,"1",        // Z
-                                new Array(0,0,0,1,0,2,0,-1) , new Array(0,1,1,1,2,1,-1,1) , new Array(1,0,1,1,1,2,1,-1) , new Array(0,0,1,0,2,0,-1,0),"0",    // I
-                                 new Array(1,0,2,0,1,1,1,2) , new Array(0,0,0,1,1,1,2,1) , new Array(1,0,1,1,1,2,0,2) , new Array(0,1,1,1,2,1,2,2),"5",        // L
-                                  new Array(0,0,1,0,1,1,1,2) , new Array(0,1,1,1,2,1,0,2) , new Array(1,0,1,1,1,2,2,2) , new Array(0,1,1,1,2,1,2,0),"6");    // J
-        
-        var SCORES = new Array(40,100,300,1200);
-        
-        var LEVEL_STR;
-        var ROWS_STR;
-        var SCORE_STR;
-        var PAUSE_STR;
-        var GAMEOVER_STR;
-        var NEXT_STR;
-        var ABORT_STR;
-        var QUIT_STR;
-        var RESUME_STR;
         
 
         /*-----------------------------------------------------------------------------*/
@@ -77,7 +76,7 @@
         
         function add_score(s)
         {
-            score += s*current_level;
+            score += s;
             update_score();
         }
         
@@ -91,7 +90,6 @@
             cadre.innerHTML = ROWS_STR+"<br/>"+lignes;
         }
         
-
         function update_level()
         {
             var old_niv = current_level;
@@ -104,14 +102,16 @@
             {
                 var game = document.getElementById("game_wrapper");
                 game.style.backgroundImage = "url('assets/"+background_folder+"/"+current_level+".png')";
+
+                if(current_level > 1) {
+                    setTimeout("sound('level')", 500);
+                }
             }
             
-            //current_speed = START_SPEED - DELTA_SPEED*(current_level-1);
-            current_speed = Math.floor(START_SPEED * (Math.pow(COEF_SPEED,current_level-1)));
+            current_speed = SPEEDS[current_level-1];
             
             update_score();
         }
-        
         
         /*-----------------------------------------------------------------------------*/
         /* Initialisations */
@@ -129,13 +129,13 @@
             contenu += "<div id=\"game_canvas\">";
             for(j=0 ; j<HEIGHT; j++)
                 for(i=0 ; i<WIDTH ; i++)
-                    contenu += "<div id=\"bloc"+i+"-"+j+"\"></div>";
+                    contenu += "<div id=\"block"+i+"-"+j+"\"></div>";
             contenu += "<div id=\"info\"><div id=\"info_label\"></div><a id=\"info_button1\" href=\"#\"></a><a id=\"info_button2\" href=\"#\"></a></div></div>";
             
             contenu += "<div id=\"cadre_next\">";
             for(j=0 ; j<4; j++)
                 for(i=WIDTH+1 ; i<WIDTH+4 ; i++)
-                       contenu += "<div id=\"bloc"+i+"-"+j+"\"></div>";
+                       contenu += "<div id=\"block"+i+"-"+j+"\"></div>";
             contenu += NEXT_STR+"</div>";
 
             contenu += "<div id=\"score1\">"+LEVEL_STR+"<br />&nbsp;</div><div id=\"score2\">"+SCORE_STR+"<br />&nbsp;</div><div id=\"score3\">"+ROWS_STR+"<br />&nbsp;</div>";
@@ -143,7 +143,11 @@
 
             cadre.innerHTML = contenu;
             
-            cadre.style.width = (CELL_SIZE*(WIDTH+3)+29)+"px";
+            if(tiles_folder === "classic_tiles") {
+                cadre.style.width = (CELL_SIZE*(WIDTH+3*2)+27*2+2)+"px";
+            } else {
+                cadre.style.width = (CELL_SIZE*(WIDTH+3)+27+2)+"px";
+            }
             //cadre.style.height = CELL_SIZE*HEIGHT+"px";
             
             var game = document.getElementById("game_canvas");
@@ -157,8 +161,8 @@
             info.style.marginTop = ((CELL_SIZE*HEIGHT-100)/2)+"px";
 
 
-            var bloc = document.getElementById("cadre_next");
-            bloc.style.width = (3*CELL_SIZE+10)+"px";
+            var block = document.getElementById("cadre_next");
+            block.style.width = (3*CELL_SIZE+10)+"px";
             
             document.getElementById("score1").style.width = (3*CELL_SIZE+10)+"px";
             document.getElementById("score2").style.width = (3*CELL_SIZE+10)+"px";
@@ -170,20 +174,20 @@
                 {
                     if(i != WIDTH && (i<WIDTH || j<4))
                     {
-                        bloc = document.getElementById("bloc"+i+"-"+j);
-                        bloc.style.width = (CELL_SIZE)+"px";
-                        bloc.style.height = (CELL_SIZE)+"px";
-                        bloc.style.cssFloat = "left";
+                        block = document.getElementById("block"+i+"-"+j);
+                        block.style.width = (CELL_SIZE)+"px";
+                        block.style.height = (CELL_SIZE)+"px";
+                        block.style.cssFloat = "left";
                     }
                 }
             }
             
-            showed_blocks = new Array();
+            showed_blocks = [];
             for(i=0 ; i<WIDTH ; i++)
             {
-                showed_blocks[i] = new Array();
+                showed_blocks[i] = [];
                 for(j=0 ; j<HEIGHT; j++)
-                    showed_blocks[i][j]=false;
+                    showed_blocks[i][j]=0;
             }
 
             document.getElementById("info_button1").onclick = toggle_pause;
@@ -205,8 +209,8 @@
 
         function reset()
         {
-            current_bloc = null;
-            next_bloc_id = null;
+            current_block = null;
+            next_block_id = null;
             is_paused = false;
             is_game_ended = false;
             ignore_user = false;
@@ -217,8 +221,8 @@
             last_failed_move = null;
             lines_to_remove = null;
             
-            commands_down = new Array();
-            bag = new Array(true, true, true,true, true, true, true);
+            commands_down = [];
+            bag = [true, true, true,true, true, true, true];
             
             score = 0;
             lignes = 0;
@@ -255,9 +259,9 @@
             
             set_info(null);
 
-            next_bloc_id = next_bloc();
-            new_bloc();
-            display_current_bloc_if_possible();
+            next_block_id = next_block();
+            new_block();
+            display_current_block_if_possible();
             update_score();
             start_music(true);
             
@@ -288,12 +292,11 @@
         }
         
         function save_score(score, mode) {
-            if(score > localStorage.getItem('best_score_'+mode)) {
-                localStorage.setItem('best_score_'+mode, score);
+            if(score > localStorage.getItem("best_score_"+mode)) {
+                localStorage.setItem("best_score_"+mode, score);
                 load_scores();
             }
         }
-
 
         function toggle_pause()
         {
@@ -334,7 +337,7 @@
         function set_enable_next(bool)
         {
             enable_next = bool;
-            display_next_bloc();
+            display_next_block();
         }
         
         function set_enable_ghost(bool)
@@ -343,18 +346,18 @@
         }
         
         /*-----------------------------------------------------------------------------*/
-        /* Lancement d'un nouveau bloc */
+        /* Lancement d'un nouveau block */
         
-        var current_bloc_x;
-        var current_bloc_y;
-        var current_bloc_id;
-        var current_bloc_orientation;
-        var current_bloc = null;
-        var next_bloc_id;
+        var current_block_x;
+        var current_block_y;
+        var current_block_id;
+        var current_block_orientation;
+        var current_block = null;
+        var next_block_id;
         
-        function new_bloc()
+        function new_block(strong_drop)
         {
-            if(current_bloc != null && is_current_bloc_out())
+            if(current_block != null && is_current_block_out())
             {
                 abort();
                 return;
@@ -364,22 +367,21 @@
                 perform(last_failed_move);
             
             ignore_user = true;
-            if(current_bloc == null)
-                new_bloc_end();
+            if(current_block == null)
+                new_block_end();
             else
-                check_lines();
+                check_lines(strong_drop);
         }
 
-
-        function new_bloc_end()
+        function new_block_end()
         {
-            current_bloc_x = 4;
-            current_bloc_y = -1;
-            current_bloc_orientation = 0;
-            current_bloc_id = next_bloc();
-            update_current_bloc();
-            display_next_bloc();
-            if(!display_current_bloc_if_possible())
+            current_block_x = 4;
+            current_block_y = -1;
+            current_block_orientation = 0;
+            current_block_id = next_block();
+            update_current_block();
+            display_next_block();
+            if(!display_current_block_if_possible())
             {
                 abort();
             }
@@ -387,15 +389,15 @@
             ignore_user = false;
         }
         
-        function next_bloc()
+        function next_block()
         {
             if(enable_bastard)
             {
-                next_bloc_id = -1;
+                next_block_id = -1;
                 return next_block_bastard();
             } else {
-                var next = next_bloc_id != null ? next_bloc_id :next_block_standard();
-                next_bloc_id = next_block_standard();
+                var next = next_block_id != null ? next_block_id :next_block_standard();
+                next_block_id = next_block_standard();
                 return next;
             }
 
@@ -436,14 +438,15 @@
         
         function num_sort_asc(a, b){ return (a-b); }
         
-        function check_lines()
+        function check_lines(strong_drop)
         {
-            if(typeof(current_bloc_id)!='undefined')
+            if(typeof(current_block_id)!="undefined")
             {
-                var l = new Array(current_bloc_y+current_bloc[1],current_bloc_y+current_bloc[3],current_bloc_y+current_bloc[5],current_bloc_y+current_bloc[7]);
+                var l = [current_block_y+current_block[1],current_block_y+current_block[3],current_block_y+current_block[5],current_block_y+current_block[7]];
                 var cl=-1,k,i,t=false,n=0;
-                lines_to_remove = new Array();
+                lines_to_remove = [];
                 l.sort(num_sort_asc);
+                var smallBonus = false;
                 for(k = 0 ; k<= 3 ; k++)
                 {
                     if(l[k] != cl)
@@ -457,15 +460,20 @@
                             rmlines(cl);
                             lines_to_remove[n] = cl;
                             n++;
+                            smallBonus = smallBonus || is_all_same(cl);
                         }
 
                     }
                 }
-                push_sound(n);
+                if(n || !strong_drop || !sound("strong"))
+                    push_sound(n);
                 add_lines(n);
                 if(n>0)
                 {
                     add_score(SCORES[n-1]);
+                    if(smallBonus) {
+                        add_score(2500);
+                    }
                     if(rmlines_time_out != null)
                         clearTimeout(rmlines_time_out);
                     rmlines_time_out = setTimeout("rmlines_end()",100);
@@ -475,6 +483,27 @@
             }
         }
         
+        function is_all_cleared() {
+            for(var i=0; i<WIDTH;++i) {
+                for(var j=0; j<HEIGHT; ++j) {
+                    if(is_cell_showed(i,j)) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        function is_all_same(line) {
+            var first = showed_blocks[0][line];
+            for(var i=1 ; i<WIDTH ; ++i) {
+                if(showed_blocks[i][line] !== first) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         function rmlines_end()
         {
             var k;
@@ -485,7 +514,10 @@
                 rmline(lines_to_remove[k]);
             }
             lines_to_remove = null;
-            new_bloc_end();
+            if(is_all_cleared()) {
+                add_score(10000);
+            }
+            new_block_end();
         }
         
         function rmlines(l)
@@ -512,88 +544,88 @@
         
         
         /*-----------------------------------------------------------------------------*/
-        /* Mise à jour du bloc courant */
-        function update_current_bloc()
+        /* Mise à jour du block courant */
+        function update_current_block()
         {
-            current_bloc = BLOCS[current_bloc_orientation+5*current_bloc_id];
+            current_block = BLOCKS[current_block_orientation+5*current_block_id];
         }
         
 
 
         /*-----------------------------------------------------------------------------*/
-        /* Vérifications pour les blocs */
+        /* Vérifications pour les blocks */
 
         function is_free(i,j)
         {
             return (i>=0 && i<WIDTH && j<HEIGHT && !is_cell_showed(i,j));
         }
 
-        function check_current_bloc_at(x, y)
+        function check_current_block_at(x, y)
         {
-            return (is_free(x+current_bloc[0],y+current_bloc[1])
-            && is_free(x+current_bloc[2],y+current_bloc[3])
-            && is_free(x+current_bloc[4],y+current_bloc[5])
-            && is_free(x+current_bloc[6],y+current_bloc[7]));
+            return (is_free(x+current_block[0],y+current_block[1])
+            && is_free(x+current_block[2],y+current_block[3])
+            && is_free(x+current_block[4],y+current_block[5])
+            && is_free(x+current_block[6],y+current_block[7]));
         }
 
-        function is_current_bloc_out()
+        function is_current_block_out()
         {
-            return current_bloc_y+current_bloc[1]<0
-            || current_bloc_y+current_bloc[3]<0
-            || current_bloc_y+current_bloc[5]<0
-            || current_bloc_y+current_bloc[7]<0;
+            return current_block_y+current_block[1]<0
+            || current_block_y+current_block[3]<0
+            || current_block_y+current_block[5]<0
+            || current_block_y+current_block[7]<0;
         }
         
         /*-----------------------------------------------------------------------------*/
-        /* Affichage des blocs */
+        /* Affichage des blocks */
         
-        var ghost_bloc_x;
-        var ghost_bloc_y;
+        var ghost_block_x;
+        var ghost_block_y;
         
-        function display_ghost_bloc(x,y)
+        function display_ghost_block(x,y)
         {
             if(enable_ghost)
             {
                 y ++;
-                while(check_current_bloc_at(x, y))
+                while(check_current_block_at(x, y))
                     y++;
                 y --;
-                ghost_bloc_x = x;
-                ghost_bloc_y = y;
-                display_current_bloc(x,y, true);
+                ghost_block_x = x;
+                ghost_block_y = y;
+                display_current_block(x,y, true);
             }
         }
         
-        function display_current_bloc(x, y, ghost)
+        function display_current_block(x, y, ghost)
         {
-            show_cell(x+current_bloc[0],y+current_bloc[1], ghost);
-            show_cell(x+current_bloc[2],y+current_bloc[3], ghost);
-            show_cell(x+current_bloc[4],y+current_bloc[5], ghost);
-            show_cell(x+current_bloc[6],y+current_bloc[7], ghost);
+            show_cell(x+current_block[0],y+current_block[1], ghost);
+            show_cell(x+current_block[2],y+current_block[3], ghost);
+            show_cell(x+current_block[4],y+current_block[5], ghost);
+            show_cell(x+current_block[6],y+current_block[7], ghost);
         }
         
-        function replace_and_display_current_bloc_if_possible()
+        function replace_and_display_current_block_if_possible()
         {
-            if(!display_current_bloc_if_possible())
+            if(!display_current_block_if_possible())
             {
-                var x = current_bloc_x;
-                var min = min4(x+current_bloc[0] , x+current_bloc[2], x+current_bloc[4], x+current_bloc[6]);
+                var x = current_block_x;
+                var min = min4(x+current_block[0] , x+current_block[2], x+current_block[4], x+current_block[6]);
 
                 if(min<0)
                 {
-                    current_bloc_x += -min;
-                    if(display_current_bloc_if_possible())
+                    current_block_x += -min;
+                    if(display_current_block_if_possible())
                         return true;
-                    current_bloc_x -= -min;
+                    current_block_x -= -min;
                     return false;
                 }
-                var max = max4(x+current_bloc[0] , x+current_bloc[2], x+current_bloc[4], x+current_bloc[6]);
+                var max = max4(x+current_block[0] , x+current_block[2], x+current_block[4], x+current_block[6]);
                 if(max >= WIDTH)
                 {
-                    current_bloc_x -= (max-WIDTH)+1;
-                    if(display_current_bloc_if_possible())
+                    current_block_x -= (max-WIDTH)+1;
+                    if(display_current_block_if_possible())
                         return true;
-                    current_bloc_x += (max-WIDTH)+1;
+                    current_block_x += (max-WIDTH)+1;
                     return false;
                     
                 }
@@ -602,12 +634,12 @@
             return true;
         }
 
-        function display_current_bloc_if_possible()
+        function display_current_block_if_possible()
         {
-            if(check_current_bloc_at(current_bloc_x, current_bloc_y))
+            if(check_current_block_at(current_block_x, current_block_y))
             {
-                display_ghost_bloc(current_bloc_x, current_bloc_y);
-                display_current_bloc(current_bloc_x, current_bloc_y, false);
+                display_ghost_block(current_block_x, current_block_y);
+                display_current_block(current_block_x, current_block_y, false);
                 
                 return true;
             }
@@ -615,36 +647,36 @@
                 return false;
         }
         
-        function hide_current_bloc()
+        function hide_current_block()
         {
-            hide_cell(ghost_bloc_x+current_bloc[0],ghost_bloc_y+current_bloc[1], true);
-            hide_cell(ghost_bloc_x+current_bloc[2],ghost_bloc_y+current_bloc[3], true);
-            hide_cell(ghost_bloc_x+current_bloc[4],ghost_bloc_y+current_bloc[5], true);
-            hide_cell(ghost_bloc_x+current_bloc[6],ghost_bloc_y+current_bloc[7], true);
+            hide_cell(ghost_block_x+current_block[0],ghost_block_y+current_block[1], true);
+            hide_cell(ghost_block_x+current_block[2],ghost_block_y+current_block[3], true);
+            hide_cell(ghost_block_x+current_block[4],ghost_block_y+current_block[5], true);
+            hide_cell(ghost_block_x+current_block[6],ghost_block_y+current_block[7], true);
 
-            hide_cell(current_bloc_x+current_bloc[0],current_bloc_y+current_bloc[1], false);
-            hide_cell(current_bloc_x+current_bloc[2],current_bloc_y+current_bloc[3], false);
-            hide_cell(current_bloc_x+current_bloc[4],current_bloc_y+current_bloc[5], false);
-            hide_cell(current_bloc_x+current_bloc[6],current_bloc_y+current_bloc[7], false);
+            hide_cell(current_block_x+current_block[0],current_block_y+current_block[1], false);
+            hide_cell(current_block_x+current_block[2],current_block_y+current_block[3], false);
+            hide_cell(current_block_x+current_block[4],current_block_y+current_block[5], false);
+            hide_cell(current_block_x+current_block[6],current_block_y+current_block[7], false);
         }
         
-        function display_next_bloc()
+        function display_next_block()
         {
             var i,j;
             for(i=0;i<4;i++)
                 for(j=0;j<4;j++)
                     hide_cell(WIDTH+1+i,j,false);
             
-            if(enable_next && next_bloc_id != -1)
+            if(enable_next && next_block_id != -1)
             {
-                var np = BLOCS[5*next_bloc_id];
-                var at = current_bloc_id;
-                current_bloc_id = next_bloc_id;
+                var np = BLOCKS[5*next_block_id];
+                var at = current_block_id;
+                current_block_id = next_block_id;
                 show_cell(WIDTH+1+np[0],1+np[1]);
                 show_cell(WIDTH+1+np[2],1+np[3]);
                 show_cell(WIDTH+1+np[4],1+np[5]);
                 show_cell(WIDTH+1+np[6],1+np[7]);
-                current_bloc_id = at;
+                current_block_id = at;
             }
         }
         
@@ -653,7 +685,7 @@
         
         function get_cell(i,j)
         {
-            return document.getElementById("bloc"+i+"-"+j);
+            return document.getElementById("block"+i+"-"+j);
         }
 
         function highlight_cell(i,j)
@@ -674,15 +706,15 @@
                 {
                     b.style.opacity = 0.4;
                     b.style.backgroundImage="url('assets/"+tiles_folder+"/ghost.png')";
-                    b.className = "ghost_bloc";
+                    b.className = "ghost_block";
                 }
                 else
                 {
-                    b.style.backgroundImage="url('assets/"+tiles_folder+"/"+BLOCS[4+5*current_bloc_id]+".png')";
+                    b.style.backgroundImage="url('assets/"+tiles_folder+"/"+BLOCKS[4+5*current_block_id]+".png')";
                     b.style.opacity = 1;
-                    b.className = "bloc";
+                    b.className = "block";
                     if(i>=0 && i<WIDTH && j<HEIGHT && j >= 0)
-                        showed_blocks[i][j] = true;
+                        showed_blocks[i][j] = BLOCKS[4+5*current_block_id];
                 }
             }
         }
@@ -697,19 +729,19 @@
                     b.style.backgroundImage="";
                     b.className = "";
                     if(i>=0 && i<WIDTH && j<HEIGHT && j >= 0)
-                        showed_blocks[i][j] = false;
+                        showed_blocks[i][j] = 0;
                 }
             }
         }
         
         function copy_cell(ai,aj,i,j)
         {
-            var bloc = get_cell(ai,aj);
-            var bloc2 = get_cell(i,j);
-            bloc.style.backgroundColor = bloc2.style.backgroundColor;
-            bloc.style.backgroundImage = bloc2.style.backgroundImage;
-            bloc.style.opacity = bloc2.style.opacity;
-            bloc.className = bloc2.className;
+            var block = get_cell(ai,aj);
+            var block2 = get_cell(i,j);
+            block.style.backgroundColor = block2.style.backgroundColor;
+            block.style.backgroundImage = block2.style.backgroundImage;
+            block.style.opacity = block2.style.opacity;
+            block.className = block2.className;
             
             showed_blocks[ai][aj] = showed_blocks[i][j];
         }
@@ -720,11 +752,14 @@
                 return true;
             if(j<0)
                 return false;
-            return showed_blocks[i][j];
+            return showed_blocks[i][j] !== 0;
         }
 
         /*-----------------------------------------------------------------------------*/
-        /* Déplacement des blocs */
+        /* Déplacement des blocks */
+
+        var slow_move = false;
+        var slow_move_count = 0;
 
         function move()
         {
@@ -732,18 +767,30 @@
             {
                 if(repeated_command != "down" && !ignore_user)
                 {
-                    hide_current_bloc();
-                    current_bloc_y ++;
-                    if(! display_current_bloc_if_possible())
+                    hide_current_block();
+                    current_block_y ++;
+                    if(! display_current_block_if_possible())
                     {
-                        current_bloc_y --;
-                        display_current_bloc_if_possible();
-                        new_bloc();
+                        current_block_y --;
+                        display_current_block_if_possible();
+                        if(!slow_move) {
+                            slow_move = true;
+                            slow_move_count = 4;
+                        } else if(slow_move_count > 0) {
+                            slow_move_count --;
+                        } else {
+                            slow_move = false;
+                            slow_move_count = 0;
+                            new_block();
+                        }
+                    } else {
+                        slow_move = false;
+                        slow_move_count = 0;
                     }
                 }
                 if(move_time_out != null)
                     clearTimeout(move_time_out);
-                move_time_out = setTimeout("move()",current_speed);
+                move_time_out = setTimeout("move()", slow_move ? 50 : current_speed);
             }
         }
         
@@ -752,11 +799,9 @@
         
         var repeated_command = null;
         var repeat_enabled = false;
-        var commands_down = new Array();
+        var commands_down = [];
         var repeat_id = 0;
         var last_failed_move = null;
-        
-
         
         function command_down(command)
         {
@@ -843,64 +888,64 @@
             {
                 if(command == "left")
                 {
-                    hide_current_bloc();
-                    current_bloc_x --;
-                    if(! display_current_bloc_if_possible())
+                    hide_current_block();
+                    current_block_x --;
+                    if(! display_current_block_if_possible())
                     {
                         last_failed_move = "left";
-                        current_bloc_x ++;
-                        display_current_bloc_if_possible()
+                        current_block_x ++;
+                        display_current_block_if_possible()
                     }
                 }
                 else if(command == "down")
                 {
-                    hide_current_bloc();
-                    current_bloc_y ++;
-                    if(! display_current_bloc_if_possible())
+                    hide_current_block();
+                    current_block_y ++;
+                    if(! display_current_block_if_possible())
                     {
-                        current_bloc_y --;
-                        display_current_bloc_if_possible();
-                        new_bloc();
+                        current_block_y --;
+                        display_current_block_if_possible();
+                        new_block(true);
                     }
                 }
                 else if(command == "right")
                 {
-                    hide_current_bloc();
-                    current_bloc_x ++;
-                    if(! display_current_bloc_if_possible())
+                    hide_current_block();
+                    current_block_x ++;
+                    if(! display_current_block_if_possible())
                     {
                         last_failed_move = "right";
-                        current_bloc_x --;
-                        display_current_bloc_if_possible();
+                        current_block_x --;
+                        display_current_block_if_possible();
                     }
                 }
                 else if(command == "rotate_l" || command == "rotate_r")
                 {
                     var incr = command == "rotate_l" ? 1 : -1;
-                    hide_current_bloc();
-                    current_bloc_orientation = modulo4(current_bloc_orientation+incr);
-                    update_current_bloc();
-                    if(! replace_and_display_current_bloc_if_possible())
+                    hide_current_block();
+                    current_block_orientation = modulo4(current_block_orientation+incr);
+                    update_current_block();
+                    if(! replace_and_display_current_block_if_possible())
                     {
-                        current_bloc_orientation = modulo4(current_bloc_orientation-incr);
-                        update_current_bloc();
-                        display_current_bloc_if_possible();
+                        current_block_orientation = modulo4(current_block_orientation-incr);
+                        update_current_block();
+                        display_current_block_if_possible();
                     }
                 }
                 else if(command == "drop")
                 {
                     var l=0;
                     do {
-                        hide_current_bloc();
-                        current_bloc_y ++;
+                        hide_current_block();
+                        current_block_y ++;
                         l++;
                     }
-                    while(display_current_bloc_if_possible());
-                    current_bloc_y --;
+                    while(display_current_block_if_possible());
+                    current_block_y --;
                     if(!enable_bastard || enable_random_bastard)
                         add_score(l);
-                    display_current_bloc_if_possible();
-                    new_bloc();
+                    display_current_block_if_possible();
+                    new_block(true);
                 }
             }
         }
@@ -941,15 +986,16 @@
                         myVideo.currentTime = navigator.userAgent.indexOf("Safari")>-1 ? 0 : 0.2;
                     } catch (e) {}
                     myVideo.play();
+                    return true;
                 }
             }
+            return false;
         }
 
         function push_sound(l)
         {
-            sound("push"+l);
+            return sound("push"+l);
         }
-        
         
         function set_info(str, abort_str, resume_str)
         {
@@ -995,7 +1041,6 @@
         {
             return Math.max(Math.max(a,b),Math.max(c,d));
         }
-        
 
         /*-----------------------------------------------------------------------------*/
         /* Bastard block */
@@ -1004,10 +1049,10 @@
         
         function copy_showed_blocks()
         {
-            showed_blocks_copy = new Array();
+            showed_blocks_copy = [];
             for(i=0 ; i<WIDTH ; i++)
             {
-                showed_blocks_copy[i] = new Array();
+                showed_blocks_copy[i] = [];
                 for(j=0 ; j<HEIGHT; j++)
                 {
                     showed_blocks_copy[i][j] = showed_blocks[i][j]?2:1;
@@ -1050,14 +1095,14 @@
 
                 for(orient = 0 ; orient < 4 ; orient ++)
                 {
-                    var c_block = BLOCS[5*block + orient];
+                    var c_block = BLOCKS[5*block + orient];
                     var width = block_width(c_block);
                     
                     for(row = -2 ; row < WIDTH+2 ; row ++)
                     {
                         for(column = -2 ; column < HEIGHT+2 ; column ++)
                         {
-                            var rate = test_bloc(c_block, row, column, width);
+                            var rate = test_block(c_block, row, column, width);
 
                             if(rate > best_rate)
                                 best_rate = rate;
@@ -1070,7 +1115,7 @@
 
                 if(best_rate < worse_rate)
                 {
-                    worse_blocks = new Array();
+                    worse_blocks = [];
                     worse_rate = best_rate;
                 }
                 if(best_rate <= worse_rate)
@@ -1102,7 +1147,7 @@
         function block_width(b)
         {
             var k;
-            var x = new Array(false, false, false, false);
+            var x = [false, false, false, false];
             var result = 0;
             for(k = 0 ; k<4 ; k++)
             {
@@ -1115,7 +1160,7 @@
             return result;
         }
         
-        function test_bloc(block, i, j, width)
+        function test_block(block, i, j, width)
         {
             var k;
             for(k = 0 ; k<4 ; k++)
@@ -1135,19 +1180,19 @@
                 return -1;
             
             for(k = 0 ; k<4 ; k++)
-                showed_blocks[block[2*k]+i][block[2*k+1]+j] = true;
+                showed_blocks[block[2*k]+i][block[2*k+1]+j] = 1;
             
             var nbline = count_lines(block, j);
             
             for(k = 0 ; k<4 ; k++)
-                showed_blocks[block[2*k]+i][block[2*k+1]+j] = false;
+                showed_blocks[block[2*k]+i][block[2*k+1]+j] = 0;
             
             return 2*nbline + appuis/width;
         }
         
-        function count_lines(current_bloc, current_bloc_y)
+        function count_lines(current_block, current_block_y)
         {
-            var l = new Array(current_bloc_y+current_bloc[1],current_bloc_y+current_bloc[3],current_bloc_y+current_bloc[5],current_bloc_y+current_bloc[7]);
+            var l = [current_block_y+current_block[1],current_block_y+current_block[3],current_block_y+current_block[5],current_block_y+current_block[7]];
             var cl=-1,k,i,t=false,n=0;
             l.sort(num_sort_asc);
             for(k = 0 ; k<= 3 ; k++)
@@ -1218,24 +1263,21 @@
         }
 
         function load_prefs() {
-            toggle_mode(localStorage.getItem('pref_mode') || 0);
-            toggle_style(localStorage.getItem('pref_style') || 0);
-            toggle_music(localStorage.getItem('pref_music') || 0);
-            toggle_ghost(localStorage.getItem('pref_ghost') || 0);
+            toggle_mode(localStorage.getItem("pref_mode") || 0);
+            toggle_style(localStorage.getItem("pref_style") || 0);
+            toggle_music(localStorage.getItem("pref_music") || 0);
+            toggle_ghost(localStorage.getItem("pref_ghost") || 0);
         }
 
         function load_scores() {
-            document.getElementById('best_score_0').innerText = localStorage.getItem('best_score_0') || 0;
-            document.getElementById('best_score_1').innerText = localStorage.getItem('best_score_1') || 0;
-            document.getElementById('best_score_2').innerText = localStorage.getItem('best_score_2') || 0;
+            document.getElementById("best_score_0").innerText = localStorage.getItem("best_score_0") || 0;
+            document.getElementById("best_score_1").innerText = localStorage.getItem("best_score_1") || 0;
+            document.getElementById("best_score_2").innerText = localStorage.getItem("best_score_2") || 0;
         }
 
-/*
-        var enable_bag = false;
-        var enable_bastard = true;*/
         function toggle_mode(mode)
         {
-            localStorage.setItem('pref_mode', mode);
+            localStorage.setItem("pref_mode", mode);
             var mode0 = document.getElementById("toggle0");
             var mode1 = document.getElementById("toggle1");
             var mode2 = document.getElementById("toggle2");
@@ -1247,24 +1289,22 @@
                 enable_bastard = false;
                 enable_bag = true;
                 mode0.className = "selected";
-                toggle_ghost(0);
             } else if(mode == 1) {
                 enable_bastard = true;
                 enable_bag = false;
                 enable_random_bastard = true;
                 mode1.className = "selected";
-                toggle_ghost(1);
             } else {
                 enable_bastard = true;
                 enable_bag = false;
                 enable_random_bastard = false;
                 mode2.className = "selected";
-                toggle_ghost(1);
             }
         }
+        
         function toggle_style(style)
         {
-            localStorage.setItem('pref_style', style);
+            localStorage.setItem("pref_style", style);
             var style0 = document.getElementById("style0");
             var style1 = document.getElementById("style1");
             var copyright = document.getElementById("style_copyright");
@@ -1272,20 +1312,21 @@
             style1.className = "";
             if(style == 0)
             {
-                background_folder = "modern_backgrounds";
-                tiles_folder = "modern_tiles";
-                style0.className = "selected";
-                copyright.innerText = "";
-            } else  {
                 background_folder = "classic_backgrounds";
                 tiles_folder = "classic_tiles";
-                style1.className = "selected";
+                style0.className = "selected";
                 copyright.innerText = "© Visuals: Steve Chamberlin";
+            } else  {
+                background_folder = "modern_backgrounds";
+                tiles_folder = "modern_tiles";
+                style1.className = "selected";
+                copyright.innerText = "";
             }
         }
+        
         function toggle_music(music)
         {
-            localStorage.setItem('pref_music', music);
+            localStorage.setItem("pref_music", music);
             var music0 = document.getElementById("music0");
             var music1 = document.getElementById("music1");
             var music2 = document.getElementById("music2");
@@ -1299,13 +1340,13 @@
                 set_enable_music(true);
                 sound_set = "1";
                 music0.className = "selected";
-                copyright.innerText = "© Music: Skandalo Publico";
+                copyright.innerText = "© Music: Peter Wagner, SFX: Steve Chamberlin";
             } else if(music == 1) {
                 set_enable_sounds(true);
                 set_enable_music(true);
                 sound_set = "2";
                 music1.className = "selected";
-                copyright.innerText = "© Music: Peter Wagner, SFX: Steve Chamberlin";
+                copyright.innerText = "© Music: Skandalo Publico";
             } else {
                 set_enable_sounds(false);
                 set_enable_music(false);
@@ -1313,19 +1354,12 @@
                 copyright.innerText = "";
             }
         }
+        
         function toggle_ghost(ghost)
         {
             var ghost0 = document.getElementById("ghost0");
             var ghost1 = document.getElementById("ghost1");
-            if(enable_bastard) {
-                ghost = 1;
-                ghost0.style.opacity = 0.4;
-                ghost1.style.opacity = 0.4;
-            } else {
-                ghost0.style.opacity = 1;
-                ghost1.style.opacity = 1;
-            }
-            localStorage.setItem('pref_ghost', ghost);
+            localStorage.setItem("pref_ghost", ghost);
             ghost0.className = "";
             ghost1.className = "";
             if(ghost == 0)
@@ -1337,7 +1371,6 @@
                 ghost1.className = "selected";
             }
         }
-
 
         function show_menu()
         {
@@ -1398,6 +1431,9 @@
         text-align: center;
         margin:48px 0;
     }
+    #menu_wrapper #start_container input {
+        cursor: pointer;
+    }
     #menu_wrapper table td{
         width:125px;
     }
@@ -1450,7 +1486,19 @@
        float:left;
        margin-left:5px;
     }
-    
+
+    #game.classic_tiles #cadre_next {
+        position: absolute;
+        margin-left: 0px;
+    }
+
+    #game.classic_tiles #game_canvas {
+        margin-left: 117px;
+    }
+    #game.classic_tiles #score1 {
+        margin-top: 0;
+    }
+
     #game #score1,
     #game #score2, 
     #game #score3 {
@@ -1462,14 +1510,14 @@
        margin-top:5px;
        margin-left:5px;
     }
-    #game.im .bloc {
+    #game.im .block {
         -webkit-box-shadow: 0px 0px 3px #000;
         border-radius: 5px;
     }
-    #game .bloc {
+    #game .block {
         background-size: 30px 30px;
     }
-    #game .ghost_bloc {
+    #game .ghost_block {
         background-size: 30px 30px;
     }
     #commands_wrapper {
@@ -1520,19 +1568,21 @@
 </head>
 <body  onkeydown="keydown(event);" onkeyup="keyup(event);">
     <h1 id="title">Quadra Blocks</h1>
-    <audio id="soundset1_musique" preload loop><source src="assets/modern_sounds/music.mp3"  /></audio>
-    <audio id="soundset1_push0" preload ><source src="assets/modern_sounds/0.mp3" /></audio>
-    <audio id="soundset1_push1" preload ><source src="assets/modern_sounds/1.mp3" /></audio>
-    <audio id="soundset1_push2" preload ><source src="assets/modern_sounds/2.mp3" /></audio>
-    <audio id="soundset1_push3" preload ><source src="assets/modern_sounds/3.mp3" /></audio>
-    <audio id="soundset1_push4" preload ><source src="assets/modern_sounds/4.mp3" /></audio>
-    <audio id="soundset2_musique" preload loop><source src="assets/classic_sounds/music.mp3"  /></audio>
-    <audio id="soundset2_push0" preload ><source src="assets/classic_sounds/0.mp3" /></audio>
-    <audio id="soundset2_push1" preload ><source src="assets/classic_sounds/1.mp3" /></audio>
-    <audio id="soundset2_push2" preload ><source src="assets/classic_sounds/2.mp3" /></audio>
-    <audio id="soundset2_push3" preload ><source src="assets/classic_sounds/3.mp3" /></audio>
-    <audio id="soundset2_push4" preload ><source src="assets/classic_sounds/4.mp3" /></audio>
-    <audio id="soundset2_pause" preload ><source src="assets/classic_sounds/pause.mp3" /></audio>
+    <audio id="soundset1_musique" preload loop><source src="assets/classic_sounds/music.mp3"  /></audio>
+    <audio id="soundset1_strong" preload ><source src="assets/classic_sounds/strong.mp3" /></audio>
+    <audio id="soundset1_push0" preload ><source src="assets/classic_sounds/0.mp3" /></audio>
+    <audio id="soundset1_push1" preload ><source src="assets/classic_sounds/1.mp3" /></audio>
+    <audio id="soundset1_push2" preload ><source src="assets/classic_sounds/2.mp3" /></audio>
+    <audio id="soundset1_push3" preload ><source src="assets/classic_sounds/3.mp3" /></audio>
+    <audio id="soundset1_push4" preload ><source src="assets/classic_sounds/4.mp3" /></audio>
+    <audio id="soundset1_pause" preload ><source src="assets/classic_sounds/pause.mp3" /></audio>
+    <audio id="soundset1_level" preload ><source src="assets/classic_sounds/level.mp3" /></audio>
+    <audio id="soundset2_musique" preload loop><source src="assets/modern_sounds/music.mp3"  /></audio>
+    <audio id="soundset2_push0" preload ><source src="assets/modern_sounds/0.mp3" /></audio>
+    <audio id="soundset2_push1" preload ><source src="assets/modern_sounds/1.mp3" /></audio>
+    <audio id="soundset2_push2" preload ><source src="assets/modern_sounds/2.mp3" /></audio>
+    <audio id="soundset2_push3" preload ><source src="assets/modern_sounds/3.mp3" /></audio>
+    <audio id="soundset2_push4" preload ><source src="assets/modern_sounds/4.mp3" /></audio>
     <div id="menu_wrapper">
         <div>Mode</div>
         <div>
